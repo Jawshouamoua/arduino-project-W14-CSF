@@ -31,11 +31,9 @@
 #include <MozziGuts.h>
 #include <Oscil.h> // oscillator template
 #include <tables/sin2048_int8.h> // sine table for oscillator
-#include <tables/chum9_int8.h>
-#include <LowPassFilter.h>
 
 // use: Oscil <table_size, update_rate> oscilName (wavetable), look in .h file of table #included above
-Oscil <CHUM9_NUM_CELLS, AUDIO_RATE> aSin(CHUM9_DATA);
+Oscil <SIN2048_NUM_CELLS, AUDIO_RATE> aSin(SIN2048_DATA);
 
 const unsigned int PING_SENSOR_I_PIN = 6 ;
 const unsigned int PING_SENSOR_O_PIN = 7 ;
@@ -44,12 +42,11 @@ const unsigned int BAUD_RATE = 115200 ;
 
 // to convey the volume level from updateControl() to updateAudio()
 unsigned char volume;
-LowPassFilter lpf ;
+
 
 void setup(){
   Serial.begin(115200); // set up the Serial output so we can look at the input values
-  aSin.setFreq(2.f);
-  lpf.setResonance(400) ;
+  aSin.setFreq(440);
   startMozzi(); // :))
 }
 
@@ -84,10 +81,8 @@ void updateControl(){
   //int sensor_value = mozziAnalogRead((convert/400) * 1023); // value is 0-1023
   Serial.println(sensor_value) ;
   // map it to an 8 bit range for efficient calculations in updateAudio
-  volume = map((int)sensor_value, 0, 1023, 0, 255);    
-  
-  lpf.setCutoffFreq(volume) ;
-  
+  volume = map((int)sensor_value, 0, 1023, 0, 255);  
+
   // print the value to the Serial monitor for debugging
   Serial.print("volume = ");
   Serial.println((int)volume);
@@ -95,12 +90,8 @@ void updateControl(){
 
 
 int updateAudio(){
-
-  //return ((int)aSin.next() * volume)>>8; // shift back into range after multiplying by 8 bit value
-  char asig = lpf.next(aSin.next()) ;
-  return (int)asig ;
+  return ((int)aSin.next() * volume)>>8; // shift back into range after multiplying by 8 bit value
 }
-
 
 
 void loop(){
