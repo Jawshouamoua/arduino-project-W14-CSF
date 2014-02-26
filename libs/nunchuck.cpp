@@ -14,7 +14,7 @@ void Nunchuck::initialize() {
 }
 
 bool Nunchuck::update() {
-	delay(1) ;
+	//delay(1) ;
 	Wire.requestFrom(NUNCHUCK_DEVICE_ID, NUNCHUCK_BUFFER_SIZE) ;
 	int byte_counter = 0 ;
 	while(Wire.available() && byte_counter < NUNCHUCK_BUFFER_SIZE)

@@ -33,6 +33,8 @@
 #include <tables/sin2048_int8.h> // sine table for oscillator
 #include <tables/chum9_int8.h>
 #include <LowPassFilter.h>
+#include <Wire.h>
+#include "nunchuck.h"
 
 // use: Oscil <table_size, update_rate> oscilName (wavetable), look in .h file of table #included above
 Oscil <CHUM9_NUM_CELLS, AUDIO_RATE> aSin(CHUM9_DATA);
@@ -40,16 +42,19 @@ Oscil <CHUM9_NUM_CELLS, AUDIO_RATE> aSin(CHUM9_DATA);
 const unsigned int PING_SENSOR_I_PIN = 6 ;
 const unsigned int PING_SENSOR_O_PIN = 7 ;
 const unsigned int BAUD_RATE = 115200 ;
+const unsigned int limit = 50 ;
 //const char INPUT_PIN = 0; // set the input for the knob to analog pin 0
 
 // to convey the volume level from updateControl() to updateAudio()
 unsigned char volume;
 LowPassFilter lpf ;
+Nunchuck nunchuck ;
 
 void setup(){
   Serial.begin(115200); // set up the Serial output so we can look at the input values
   aSin.setFreq(2.f);
   lpf.setResonance(400) ;
+  nunchuck.initialize() ;
   startMozzi(); // :))
 }
 
@@ -70,11 +75,11 @@ void updateControl(){
   
   int sensor_value ;
   
-  if(convert > 40) {
+  if(convert > limit) {
     sensor_value = 400 ;
   }
   else{
-    sensor_value = map((int)convert, 2, 42, 0, 1023) ;
+    sensor_value = map((int)convert, 2, limit + 2, 0, 1023) ;
     //Serial.println(((float)convert/400) * 1023) ;
   }
   //int sensor_value = 4000 * log((convert + 130)/200) + 1000 ;
@@ -91,6 +96,7 @@ void updateControl(){
   // print the value to the Serial monitor for debugging
   Serial.print("volume = ");
   Serial.println((int)volume);
+  aSin.setFreq(nunchuck.joystick_y()) ;
 }
 
 
