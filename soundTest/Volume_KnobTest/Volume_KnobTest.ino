@@ -27,13 +27,13 @@
  Tim Barrass 2013.
  This example code is in the public domain.
  */
-
+#include <Wire.h>
 #include <MozziGuts.h>
 #include <Oscil.h> // oscillator template
 #include <tables/sin2048_int8.h> // sine table for oscillator
 #include <tables/chum9_int8.h>
 #include <LowPassFilter.h>
-#include <Wire.h>
+#include <twi_nonblock.h>
 #include "nunchuck.h"
 
 // use: Oscil <table_size, update_rate> oscilName (wavetable), look in .h file of table #included above
