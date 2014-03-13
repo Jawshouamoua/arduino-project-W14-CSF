@@ -1,5 +1,5 @@
 /* 
-Joshua Kendall
+ Joshua Kendall
 Arduino instrument
 
   The circuit:
@@ -29,50 +29,43 @@ Arduino instrument
 #include <MozziGuts.h>
 #include <Oscil.h> // oscillator 
 #include <tables/cos2048_int8.h> // table for Oscils to play
-#include <tables/saw512_int8.h>
+#include <tables/saw256_int8.h>
 #include <Smooth.h>
 #include <AutoMap.h> // maps unpredictable inputs to a range
-#include <math.h>
-#include <LowPassFilter.h>
+
  
-
-// desired cutoff freq max and min for AutoMap
-
-
+// desired carrier frequency max and min, for AutoMap
+const int MIN_CARRIER_FREQ = 22;
+const int MAX_CARRIER_FREQ = 440;
 
 // desired intensity max and min, for AutoMap, note they're inverted for reverse dynamics
-const int MIN_INTENSITY = 75;
-const int MAX_INTENSITY = 5;
+const int MIN_INTENSITY = 700;
+const int MAX_INTENSITY = 10;
 
 // desired mod speed max and min, for AutoMap, note they're inverted for reverse dynamics
 const int MIN_MOD_SPEED = 10000;
 const int MAX_MOD_SPEED = 1;
 
-AutoMap kMapCarrierFreq(0,1023,0,60);
+AutoMap kMapCarrierFreq(0,1023,MIN_CARRIER_FREQ,MAX_CARRIER_FREQ);
 AutoMap kMapIntensity(0,1023,MIN_INTENSITY,MAX_INTENSITY);
-AutoMap kMapModSpeed(0,5700,MIN_MOD_SPEED,MAX_MOD_SPEED);
-AutoMap kMapCutoffFreq(0, 1023, 0, 255) ;
+AutoMap kMapModSpeed(0,1023,MIN_MOD_SPEED,MAX_MOD_SPEED);
+AutoMap kMapVolume(0,1023,0,255) ;
+AutoMap kMapCutoff(0,1023,20,0) ;
 
-const int KNOB_PIN = 0; // set the input for the freq knob to analog pin 0
-const int LDR1_PIN= 1; // set the analog input for fm_intensity to pin 1
-const int LDR2_PIN= 2; // set the analog input for mod rate to pin 2
-const int AMP_PIN = 3 ; //set analog input pin for amplitude
-const int DUB_PIN = 4 ; //set pin for wubz
+const int KNOB_PIN = 0; // set the input for the knob to analog pin 0
+const int LDR1_PIN=1; // set the analog input for fm_intensity to pin 1
+const int LDR2_PIN=2; // set the analog input for mod rate to pin 2
+const int KNOB_VOL = 3; //set volume pin
+const int KNOB_PIN2 = 4 ; //set modulation ratio pin
 
-int vib_intensity = 0 ;
-
-LowPassFilter lpf ;
-
-Oscil<SAW512_NUM_CELLS, AUDIO_RATE> aCarrier(SAW512_DATA);
-//Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCarrier(COS2048_DATA) ;
+Oscil<SAW256_NUM_CELLS, AUDIO_RATE> aCarrier(SAW256_DATA);
 Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aModulator(COS2048_DATA);
 Oscil<COS2048_NUM_CELLS, CONTROL_RATE> kIntensityMod(COS2048_DATA);
-//Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aVibrato(COS2048_DATA) ;
 
 int mod_ratio = 5; // brightness (harmonics)
 long fm_intensity; // carries control info from updateControl to updateAudio
-int volume ;
-unsigned long duration ;
+
+int volume ; 
 
 // smoothing for intensity to remove clicks on transitions
 float smoothness = 0.95f;
@@ -81,76 +74,56 @@ Smooth <long> aSmoothIntensity(smoothness);
 
 void setup(){
   Serial.begin(115200); // set up the Serial output so we can look at the light level
-  //lpf.setResonance(40) ;
-  //aVibrato.setFreq(15.f) ;
-  
   startMozzi(); // :))
 }
 
 
 void updateControl(){
-  
-  // read the freq knob
+  // read the knob
   int knob_value = mozziAnalogRead(KNOB_PIN); // value is 0-1023
-  //Serial.println(knob_value) ;
   
   // map the knob to carrier frequency
-  float carrier_freq = 13.75 * pow(2.0,(float)kMapCarrierFreq(knob_value)/12);
+  int carrier_freq = kMapCarrierFreq(knob_value);
   
   //calculate the modulation frequency to stay in ratio
-  int mod_freq = carrier_freq * mod_ratio;
+  
+  int knob2_value = mozziAnalogRead(KNOB_PIN2) ;
+  
+  int mod_freq = kMapCarrierFreq(knob2_value) * mod_ratio;
   
   // set the FM oscillator frequencies
-  aCarrier.setFreq_Q16n16(carrier_freq); 
+  aCarrier.setFreq(carrier_freq); 
   aModulator.setFreq(mod_freq);
   
   // read the light dependent resistor on the width Analog input pin
   int LDR1_value= mozziAnalogRead(LDR1_PIN); // value is 0-1023
+  // print the value to the Serial monitor for debugging
 
 
   int LDR1_calibrated = kMapIntensity(LDR1_value);
 
   
-  //push lfo forward
-  long lfo = kIntensityMod.next()+128 ;
-  
-  
  // calculate the fm_intensity
-  fm_intensity = ((long)LDR1_calibrated * lfo)>>8; // shift back to range after 8 bit multiply
+  fm_intensity = ((long)LDR1_calibrated * (kIntensityMod.next()+128))>>8; // shift back to range after 8 bit multiply
 
-  
   // read the light dependent resistor on the speed Analog input pin
-  int wubWub = mozziAnalogRead(DUB_PIN); // value is 0-1023
+  int LDR2_value= mozziAnalogRead(LDR2_PIN); // value is 0-1023
 
   
-  
-  
-  //use a float here for low frequencies
-  float mod_speed = (float)kMapModSpeed(wubWub)/1000;
-  
+  // use a float here for low frequencies
+  float mod_speed = (float)kMapModSpeed(LDR2_value)/1000;
+
   kIntensityMod.setFreq(mod_speed);
   
-  //read LDR pin 2 for vibrato intensity
-  //vib_intensity = kMapCutoffFreq(mozziAnalogRead(LDR2_PIN)) ;
+  int knob_2 = mozziAnalogRead(KNOB_VOL) ;
+  volume = kMapVolume(knob_2) ;
   
-  
-  //set low pass cutoff the same as mod_speed
-  //lpf.setCutoffFreq(cutoff) ;
-
-  
-  //set volume
-  volume = map(mozziAnalogRead(AMP_PIN), 0, 1023, 0, 255) ;
-  
-  Serial.println(); // finally, print a carraige return for the next line of debugging info
 }
 
-
 int updateAudio(){
-  //long vibrato = vib_intensity * aVibrato.next() ;
-   
   long modulation = aSmoothIntensity.next(fm_intensity) * aModulator.next();
-
   return (aCarrier.phMod(modulation) * volume) >> 8 ;
+  
 }
 
 
